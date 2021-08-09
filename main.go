@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"fmt"
 )
 
 type Task struct {
@@ -50,10 +51,26 @@ func aboutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func saveTask(name string, details string) {}
+
 func newTaskHandler(w http.ResponseWriter, r *http.Request) {
-	err := templates.ExecuteTemplate(w, "new_task.html", nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	switch r.Method {
+	case "GET":
+		err := templates.ExecuteTemplate(w, "new_task.html", nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+	case "POST":
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintf(w, "ParseForm() err: %v", err)
+			return
+		}
+		title := r.FormValue("title")
+		details := r.FormValue("details")
+		saveTask(title, details)
+		// fmt.Fprintf(w, "Post from website! r.PostFrom = %v\n", r.PostForm)
+		http.Redirect(w, r, "/tasks/", 302)
 	}
 }
 

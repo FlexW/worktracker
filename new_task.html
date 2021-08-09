@@ -8,23 +8,38 @@
     <title>Worktracker | Tasks</title>
   </head>
   <body>
-    <form class="list-group">
+    <form class="list-group" action="/new_task/" method="POST">
       <div class="form-group">
-        <input class="form-control" placeholder="New task title" />
+        <input
+          class="form-control"
+          name="title"
+          value=""
+          placeholder="New task title"
+        />
       </div>
       <div class="form-group mt-1">
         <textarea
           class="form-control"
+          name="detail"
+          value=""
           placeholder="Task details"
           rows="3"
         ></textarea>
       </div>
 
       <div class="input-group mt-1">
-        <button type="submit" class="btn btn-secondary form-control">
+        <button
+          type="submit"
+          value="submit"
+          class="btn btn-secondary form-control"
+        >
           Save
         </button>
-        <button type="submit" class="btn btn-primary form-control">
+        <button
+          type="submit"
+          value="submit"
+          class="btn btn-primary form-control"
+        >
           Save & Start
         </button>
       </div>
