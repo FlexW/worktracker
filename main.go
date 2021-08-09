@@ -20,10 +20,31 @@ var tasks = []Task{
 	{Title: "Triage issues on GitHub", Detail: "", TimeSpent: "15 minutes", Icon: "bi-check"},
 }
 
-var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html"))
+var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html", "about.html", "new_task.html"))
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
 	err := templates.ExecuteTemplate(w, "tasks.html", tasks)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func reportsHandler(w http.ResponseWriter, r *http.Request) {
+	err := templates.ExecuteTemplate(w, "reports.html", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func aboutHandler(w http.ResponseWriter, r *http.Request) {
+	err := templates.ExecuteTemplate(w, "about.html", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func newTaskHandler(w http.ResponseWriter, r *http.Request) {
+	err := templates.ExecuteTemplate(w, "new_task.html", nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -34,6 +55,9 @@ func main() {
 
 	http.Handle("/", http.RedirectHandler("/tasks/", 302))
 	http.HandleFunc("/tasks/", tasksHandler)
+	http.HandleFunc("/new_task/", newTaskHandler)
+	http.HandleFunc("/reports/", reportsHandler)
+	http.HandleFunc("/about/", aboutHandler)
 
 	log.Fatal(http.ListenAndServe(":12345", nil))
 }

@@ -5,31 +5,14 @@
 
     <link href="/css/tasks.css" type="text/css" rel="stylesheet" />
 
-    <title>Tasks</title>
+    <title>Worktracker | Tasks</title>
   </head>
   <body>
     {{ template "header.html" . }}
 
-    <form class="list-group">
-      <div class="form-group">
-        <input class="form-control" placeholder="New task title" />
-      </div>
-      <div class="form-group mt-1">
-        <input
-          class="form-control"
-          placeholder="New task description (Optional)"
-        />
-      </div>
-
-      <div class="input-group mt-1">
-        <button type="submit" class="btn btn-secondary form-control">
-          Save
-        </button>
-        <button type="submit" class="btn btn-primary form-control">
-          Save & Start
-        </button>
-      </div>
-    </form>
+    <div class="list-group">
+      <a href="/new_task/" class="btn btn-primary">New task</a>
+    </div>
 
     <div class="list-group">
       {{ range . }}
