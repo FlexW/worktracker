@@ -20,7 +20,7 @@ var tasks = []Task{
 	{Title: "Triage issues on GitHub", Detail: "", TimeSpent: "15 minutes", Icon: "bi-check"},
 }
 
-var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html", "about.html", "new_task.html"))
+var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html", "about.html", "new_task.html", "task_detail.html"))
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
 	err := templates.ExecuteTemplate(w, "tasks.html", struct {
@@ -57,6 +57,13 @@ func newTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func taskDetailHandler(w http.ResponseWriter, r *http.Request) {
+	err := templates.ExecuteTemplate(w, "task_detail.html", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func main() {
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("static/css"))))
 
@@ -65,6 +72,7 @@ func main() {
 	http.HandleFunc("/new_task/", newTaskHandler)
 	http.HandleFunc("/reports/", reportsHandler)
 	http.HandleFunc("/about/", aboutHandler)
+	http.HandleFunc("/task_detail/", taskDetailHandler)
 
 	log.Fatal(http.ListenAndServe(":12345", nil))
 }
