@@ -47,7 +47,15 @@ func NewDatabase() *database {
 	return db
 }
 
-func (db database) migrate() {}
+func (db database) migrate() error {
+	_, err := db.connection.Exec(
+		"CREATE TABLE IF NOT EXISTS tasks (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, details TEXT NOT NULL, active BOOLEAN NOT NULL)");
+	if err != nil {
+		return fmt.Errorf("Could not create table tasks: %v", err);
+	}
+
+	return nil
+}
 
 func (db database) InsertTask(task Task) (int64, error) {
 	result, err := db.connection.Exec("INSERT INTO tasks (title, details, active) VALUES (?, ?, ?)", task.Title, task.Details, task.Active)

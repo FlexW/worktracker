@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"fmt"
 )
 
 type TaskUi struct {
@@ -18,24 +18,29 @@ type worktracker struct {
 	Database *database
 }
 
-var tasks = []TaskUi{
-	{Title: "Fix bug #2312", Detail: "Needs to be done a specific way.", TimeSpent: "1 hour", Icon: "bi-clock"},
-	{Title: "Implement new feature", Detail: "Feature needs to be crazy fancy", TimeSpent: "30 minutes", Icon: "bi-check"},
-	{Title: "Fix the docs", Detail: "Docs need update.", TimeSpent: "2 hours", Icon: "bi-check"},
-	{Title: "Triage issues on GitHub", Detail: "", TimeSpent: "15 minutes", Icon: "bi-check"},
-}
-
 var db *database
 
 var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html", "about.html", "new_task.html", "task_detail.html"))
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
-	err := templates.ExecuteTemplate(w, "tasks.html", struct {
-		Tasks []TaskUi
-		HeaderTabActiveName string
-	}{tasks, "tasks"})
+	tasks, err := db.GetTasks()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var uiTasks []TaskUi
+	for _, task := range tasks {
+		uiTasks = append(uiTasks, TaskUi{Title: task.Title, Detail: task.Details, TimeSpent: "1 hour", Icon: "bi-check"})
+	}
+
+	err = templates.ExecuteTemplate(w, "tasks.html", struct {
+		Tasks               []TaskUi
+		HeaderTabActiveName string
+	}{uiTasks, "tasks"})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -78,7 +83,6 @@ func newTaskHandler(w http.ResponseWriter, r *http.Request) {
 		title := r.FormValue("title")
 		details := r.FormValue("details")
 		saveTask(title, details)
-		// fmt.Fprintf(w, "Post from website! r.PostFrom = %v\n", r.PostForm)
 		http.Redirect(w, r, "/tasks/", 302)
 	}
 }
