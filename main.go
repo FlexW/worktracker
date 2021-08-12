@@ -7,25 +7,31 @@ import (
 	"fmt"
 )
 
-type Task struct {
+type TaskUi struct {
 	Title     string
 	Detail    string
 	TimeSpent string
 	Icon      string
 }
 
-var tasks = []Task{
+type worktracker struct {
+	Database *database
+}
+
+var tasks = []TaskUi{
 	{Title: "Fix bug #2312", Detail: "Needs to be done a specific way.", TimeSpent: "1 hour", Icon: "bi-clock"},
 	{Title: "Implement new feature", Detail: "Feature needs to be crazy fancy", TimeSpent: "30 minutes", Icon: "bi-check"},
 	{Title: "Fix the docs", Detail: "Docs need update.", TimeSpent: "2 hours", Icon: "bi-check"},
 	{Title: "Triage issues on GitHub", Detail: "", TimeSpent: "15 minutes", Icon: "bi-check"},
 }
 
+var db *database
+
 var templates = template.Must(template.ParseFiles("head.html", "tasks.html", "header.html", "footer.html", "reports.html", "about.html", "new_task.html", "task_detail.html"))
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
 	err := templates.ExecuteTemplate(w, "tasks.html", struct {
-		Tasks []Task
+		Tasks []TaskUi
 		HeaderTabActiveName string
 	}{tasks, "tasks"})
 	if err != nil {
@@ -51,7 +57,10 @@ func aboutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func saveTask(name string, details string) {}
+func saveTask(name string, details string) {
+	db.InsertTask(Task{Title: name, Details: details})
+	log.Println("Task inserted")
+}
 
 func newTaskHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -82,6 +91,8 @@ func taskDetailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	db = NewDatabase()
+
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("static/css"))))
 
 	http.Handle("/", http.RedirectHandler("/tasks/", 302))
@@ -91,5 +102,5 @@ func main() {
 	http.HandleFunc("/about/", aboutHandler)
 	http.HandleFunc("/task_detail/", taskDetailHandler)
 
-	log.Fatal(http.ListenAndServe(":12345", nil))
+	log.Fatal(http.ListenAndServe(":80", nil))
 }

@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  worktracker:
+    depends_on:
+      - db
+    build:
+      context: .
+    container_name: worktracker
+    networks:
+      - worktracker_net
+    ports:
+      - 12345:80
+    environment:
+      - DBHOST=${DBHOST:-db}
+      - DBPORT=${DBPORT:-3306}
+      - DBNAME=${DBNAME:-worktracker}
+      - DBUSER=${DBUSER:-worktracker}
+      - DBPASS=${DBPASS:-secretpassword}
+    deploy:
+      restart_policy:
+        condition: on-failure
+    command: sh -c './wait-for ${DBHOST:-db}:${DBPORT:-3306} -- /worktracker'
+  db:
+    image: mysql
+    container_name: db
+    networks:
+      - worktracker_net
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_DATABASE=${DBNAME:-worktracker}
+      - MYSQL_ROOT_PASSWORD=${DBPASS:-secretpassword}
+      - MYSQL_USER=${DBUSER:-worktracker}
+      - MYSQL_PASSWORD=${DBPASS:-secretpassword}
+    volumes:
+      - db:/var/lib/mysql
+
+volumes:
+  db:
+
+networks:
+  worktracker_net:
+    driver: bridge
