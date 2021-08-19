@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -53,5 +54,18 @@ func TestTasks(t *testing.T) {
 		actualTask := Task{}
 		assertNoError(t, json.Unmarshal(response.Body.Bytes(), &actualTask))
 		assertTaskEqual(t, expectedTask, &actualTask)
+	})
+
+	t.Run("create new task", func(t *testing.T) {
+		newTask := createTasks()[0]
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(make([]*Task,0)))
+		newTaskJson, _ := json.Marshal(&newTask)
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		taskInStore := worktrackerServer.store.GetTaskById(newTask.Id)
+		assertTaskEqual(t, newTask, taskInStore)
 	})
 }

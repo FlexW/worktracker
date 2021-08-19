@@ -3,6 +3,7 @@ package main
 type WorktrackerStore interface{
 	GetAllTasks() []*Task
 	GetTaskById(taskId int) *Task
+	InsertTask(task *Task)
 }
 
 type InMemoryWorktrackerStore struct {
@@ -19,6 +20,10 @@ func (s *InMemoryWorktrackerStore) GetAllTasks() []*Task {
 
 func (s *InMemoryWorktrackerStore) GetTaskById(taskId int) *Task {
 	return s.tasks[taskId]
+}
+
+func (s *InMemoryWorktrackerStore) InsertTask(task *Task)  {
+	s.tasks[task.Id] = task
 }
 
 func createTasksMap(tasks []*Task) map[int]*Task {
