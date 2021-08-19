@@ -6,12 +6,42 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func createTasks() []*Task {
+	endTime := time.Now().Add(time.Hour)
+
 	return []*Task{
-		{Id: 0, Title: "Task One", Description: "Important task"},
-		{Id: 1, Title: "Task Two", Description: "Another important task"},
+		{
+			Id: 0,
+			Title: "Task One",
+			Description: "Important task",
+			TimeIntervals: []TimeInterval{{time.Now(), &endTime}},
+		},
+		{
+			Id: 1,
+			Title: "Task Two",
+			Description: "Another important task",
+			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+		},
+	}
+}
+
+func assertTimeIntervalEqual(t *testing.T, expected TimeInterval, actual TimeInterval) {
+	assert(t, expected.StartTime.Equal(*actual.EndTime))
+	if expected.EndTime != nil {
+		assert(t, actual.EndTime != nil)
+		assert(t, expected.EndTime.Equal(*actual.EndTime))
+	} else {
+		assert(t, actual.EndTime == nil)
+	}
+}
+
+func assertTimeIntervalsEqual(t *testing.T, expected []TimeInterval, actual []TimeInterval) {
+	assertEqual(t, len(expected), len(actual))
+	for i := range expected {
+		assertTimeIntervalEqual(t, expected[i], actual[i])
 	}
 }
 
