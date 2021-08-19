@@ -1,25 +1,11 @@
 package main
 
 import (
-	"encoding/json"
+	"log"
 	"net/http"
 )
 
-type Task struct {
-	Title       string
-	Description string
-}
-
-type WorktrackerStore interface{
-	GetAllTasks() []*Task
-}
-
-type WorktrackerServer struct {
-	store WorktrackerStore
-}
-
-func (w *WorktrackerServer) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
-	tasks := w.store.GetAllTasks()
-	tasksJson, _ := json.Marshal(&tasks)
-	responseWriter.Write(tasksJson)
+func main() {
+	server := NewWorktrackerServer(NewInMemoryWorktrackerStore(make([]*Task,0)))
+	log.Fatal(http.ListenAndServe(":12345", server))
 }
