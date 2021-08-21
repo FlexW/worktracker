@@ -7,7 +7,24 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+type TaskWithoutId struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	TimeIntervals []TimeInterval `json:"time_intervals"`
+}
+
+func taskWithoutIdToTask(taskWithoutId *TaskWithoutId, id int) *Task {
+	return &Task{
+		Id: id,
+		Title: taskWithoutId.Title,
+		Description: taskWithoutId.Description,
+		TimeIntervals: taskWithoutId.TimeIntervals,
+	}
+}
 
 func createTasks() []*Task {
 	endTime := time.Now().Add(time.Hour)
@@ -29,30 +46,30 @@ func createTasks() []*Task {
 }
 
 func assertTimeIntervalEqual(t *testing.T, expected TimeInterval, actual TimeInterval) {
-	assert(t, expected.StartTime.Equal(*actual.EndTime))
+	assert.True(t, expected.StartTime.Equal(*actual.EndTime))
 	if expected.EndTime != nil {
-		assert(t, actual.EndTime != nil)
-		assert(t, expected.EndTime.Equal(*actual.EndTime))
+		assert.True(t, actual.EndTime != nil)
+		assert.True(t, expected.EndTime.Equal(*actual.EndTime))
 	} else {
-		assert(t, actual.EndTime == nil)
+		assert.True(t, actual.EndTime == nil)
 	}
 }
 
 func assertTimeIntervalsEqual(t *testing.T, expected []TimeInterval, actual []TimeInterval) {
-	assertEqual(t, len(expected), len(actual))
+	assert.Equal(t, len(expected), len(actual))
 	for i := range expected {
 		assertTimeIntervalEqual(t, expected[i], actual[i])
 	}
 }
 
 func assertTaskEqual(t *testing.T, expectedTask *Task, actualTask *Task) {
-	assertEqual(t, expectedTask.Id, actualTask.Id)
-	assertEqual(t, expectedTask.Title, actualTask.Title)
-	assertEqual(t, expectedTask.Description, actualTask.Description)
+	assert.Equal(t, expectedTask.Id, actualTask.Id)
+	assert.Equal(t, expectedTask.Title, actualTask.Title)
+	assert.Equal(t, expectedTask.Description, actualTask.Description)
 }
 
 func assertTasksEqual(t *testing.T, expectedTasks []*Task, actualTasks []*Task) {
-	assertEqual(t, len(expectedTasks), len(actualTasks))
+	assert.Equal(t, len(expectedTasks), len(actualTasks))
 	for i := range expectedTasks {
 		assertTaskEqual(t, expectedTasks[i], actualTasks[i])
 	}
@@ -68,7 +85,7 @@ func TestTasks(t *testing.T) {
 		worktrackerServer.ServeHTTP(response, request)
 
 		actualTasks := []*Task{}
-		assertNoError(t, json.Unmarshal(response.Body.Bytes(), &actualTasks))
+		json.Unmarshal(response.Body.Bytes(), &actualTasks)
 		assertTasksEqual(t, expectedTasks, actualTasks)
 	})
 
@@ -82,12 +99,16 @@ func TestTasks(t *testing.T) {
 		worktrackerServer.ServeHTTP(response, request)
 
 		actualTask := Task{}
-		assertNoError(t, json.Unmarshal(response.Body.Bytes(), &actualTask))
+		json.Unmarshal(response.Body.Bytes(), &actualTask)
 		assertTaskEqual(t, expectedTask, &actualTask)
 	})
 
 	t.Run("create new task", func(t *testing.T) {
-		newTask := createTasks()[0]
+		newTask := TaskWithoutId{
+			Title: "Some Task",
+			Description: "Description",
+			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+		}
 		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(make([]*Task,0)))
 		newTaskJson, _ := json.Marshal(&newTask)
 		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
@@ -95,13 +116,13 @@ func TestTasks(t *testing.T) {
 
 		worktrackerServer.ServeHTTP(response, request)
 
-		taskInStore := worktrackerServer.store.GetTaskById(newTask.Id)
-		assertTaskEqual(t, newTask, taskInStore)
+		taskInStore := worktrackerServer.store.GetAllTasks()[0]
+		assertTaskEqual(t, taskWithoutIdToTask(&newTask, taskInStore.Id), taskInStore)
 	})
 
 	t.Run("create new task without end time then finish current active task", func(t *testing.T) {
 		newTask := Task{
-			Id: 3,
+			Id: 2,
 			Title: "Task One",
 			Description: "Important task",
 			TimeIntervals: []TimeInterval{{time.Now(), nil}},
@@ -117,10 +138,10 @@ func TestTasks(t *testing.T) {
 		for _, taskInStore := range tasksInStore {
 			if taskInStore.Id != newTask.Id {
 				for _, timestamps := range taskInStore.TimeIntervals {
-					assert(t, timestamps.EndTime != nil)
+					assert.NotNil(t, timestamps.EndTime)
 				}
 			} else {
-				assert(t, taskInStore.TimeIntervals[0].EndTime == nil)
+				assert.Nil(t, taskInStore.TimeIntervals[0].EndTime)
 			}
 		}
 	})

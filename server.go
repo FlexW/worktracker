@@ -56,7 +56,7 @@ func (w *WorktrackerServer) handleNewTask(c *gin.Context) {
 		return
 	}
 	w.setAllTasksInactive()
-	w.store.InsertTask(&newTask)
+	newTask.Id = w.store.InsertTask(&newTask)
 	c.IndentedJSON(http.StatusCreated, newTask)
 }
 
