@@ -98,4 +98,30 @@ func TestTasks(t *testing.T) {
 		taskInStore := worktrackerServer.store.GetTaskById(newTask.Id)
 		assertTaskEqual(t, newTask, taskInStore)
 	})
+
+	t.Run("create new task without end time then finish current active task", func(t *testing.T) {
+		newTask := Task{
+			Id: 3,
+			Title: "Task One",
+			Description: "Important task",
+			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+		}
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		newTaskJson, _ := json.Marshal(&newTask)
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		tasksInStore := worktrackerServer.store.GetAllTasks()
+		for _, taskInStore := range tasksInStore {
+			if taskInStore.Id != newTask.Id {
+				for _, timestamps := range taskInStore.TimeIntervals {
+					assert(t, timestamps.EndTime != nil)
+				}
+			} else {
+				assert(t, taskInStore.TimeIntervals[0].EndTime == nil)
+			}
+		}
+	})
 }

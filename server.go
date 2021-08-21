@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,12 +32,30 @@ func (w *WorktrackerServer) handleTaskById(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, task)
 }
 
+func (w *WorktrackerServer) setTaskInactive(task *Task) {
+	for i := range task.TimeIntervals {
+		if task.TimeIntervals[i].EndTime == nil {
+			timeNow := time.Now()
+			task.TimeIntervals[i].EndTime = &timeNow
+			// TODO: Make sure task gets saved to disk. Capture this with e2e test
+		}
+	}
+}
+
+func (w *WorktrackerServer) setAllTasksInactive() {
+	tasks := w.store.GetAllTasks()
+	for _, task := range tasks {
+		w.setTaskInactive(task)
+	}
+}
+
 func (w *WorktrackerServer) handleNewTask(c *gin.Context) {
 	var newTask Task
 
 	if err:= c.BindJSON(&newTask); err != nil {
 		return
 	}
+	w.setAllTasksInactive()
 	w.store.InsertTask(&newTask)
 	c.IndentedJSON(http.StatusCreated, newTask)
 }
