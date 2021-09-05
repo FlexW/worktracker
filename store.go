@@ -4,6 +4,7 @@ type WorktrackerStore interface{
 	GetAllTasks() []*Task
 	GetTaskById(taskId int) *Task
 	InsertTask(task *Task) int
+	UpdateTask(task *Task)
 }
 
 type InMemoryWorktrackerStore struct {
@@ -26,6 +27,10 @@ func (s *InMemoryWorktrackerStore) InsertTask(task *Task) int {
 	id := len(s.tasks)
 	s.tasks[id] = task
 	return id
+}
+
+func (s *InMemoryWorktrackerStore) UpdateTask(task *Task) {
+	s.tasks[task.Id] = task
 }
 
 func createTasksMap(tasks []*Task) map[int]*Task {

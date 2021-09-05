@@ -17,7 +17,9 @@ func NewWorktrackerServer(store WorktrackerStore) *WorktrackerServer {
 	w := &WorktrackerServer{store, gin.Default()}
 	w.router.GET("/tasks/", w.handleTasks)
 	w.router.POST("/tasks/", w.handleNewTask)
+	w.router.POST("/tasks/stop", w.handleStopTasks)
 	w.router.GET("/tasks/:id", w.handleTaskById)
+	w.router.POST("/tasks/:id", w.handleStartTask)
 	return w;
 }
 
@@ -40,6 +42,31 @@ func (w *WorktrackerServer) setTaskInactive(task *Task) {
 			// TODO: Make sure task gets saved to disk. Capture this with e2e test
 		}
 	}
+}
+
+type startTask struct {
+	StartTime string `json:"start_time"`
+}
+
+func (w *WorktrackerServer) handleStartTask(c *gin.Context) {
+	taskId := c.GetInt("id")
+	var startTimeStr startTask
+	if err := c.BindJSON(&startTimeStr); err != nil {
+		return
+	}
+	startTime, err := time.Parse(time.RFC3339, startTimeStr.StartTime)
+	if err != nil {
+		c.Err()
+	}
+	w.setAllTasksInactive()
+	task := w.store.GetTaskById(taskId)
+	task.TimeIntervals = append(task.TimeIntervals, TimeInterval{StartTime: startTime, EndTime: nil})
+	w.store.UpdateTask(task)
+	c.IndentedJSON(http.StatusOK, task)
+}
+
+func (w *WorktrackerServer) handleStopTasks(c *gin.Context) {
+	w.setAllTasksInactive()
 }
 
 func (w *WorktrackerServer) setAllTasksInactive() {

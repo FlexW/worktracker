@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,6 +43,14 @@ func createTasks() []*Task {
 			Description: "Another important task",
 			TimeIntervals: []TimeInterval{{time.Now(), nil}},
 		},
+	}
+}
+
+func assertTasksInactive(t *testing.T, tasks []*Task) {
+	for _, task := range tasks {
+		for _, timeInterval := range task.TimeIntervals {
+			assert.NotNil(t, timeInterval.EndTime)
+		}
 	}
 }
 
@@ -144,5 +153,32 @@ func TestTasks(t *testing.T) {
 				assert.Nil(t, taskInStore.TimeIntervals[0].EndTime)
 			}
 		}
+	})
+
+	t.Run("stop current task", func(t *testing.T) {
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/stop", nil)
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		tasksInStore := worktrackerServer.store.GetAllTasks()
+		assertTasksInactive(t, tasksInStore)
+	})
+
+	t.Run("start stopped task again", func(t *testing.T) {
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		timeNow := time.Now()
+		requestData := []byte(fmt.Sprintf(`{
+            "start_time": "%v"
+        }`, timeNow.Format(time.RFC3339)))
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/0", bytes.NewBuffer(requestData))
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		taskInStore := worktrackerServer.store.GetTaskById(0)
+		assert.NotNil(t, taskInStore.TimeIntervals[0].EndTime)
+		assert.Equal(t, timeNow.Truncate(time.Second), taskInStore.TimeIntervals[1].StartTime)
 	})
 }
