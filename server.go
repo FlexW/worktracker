@@ -15,6 +15,7 @@ type WorktrackerServer struct {
 
 func NewWorktrackerServer(store WorktrackerStore) *WorktrackerServer {
 	w := &WorktrackerServer{store, gin.Default()}
+	w.router.Use(cors)
 	w.router.GET("/tasks/", w.handleTasks)
 	w.router.POST("/tasks/", w.handleNewTask)
 	w.router.POST("/tasks/stop", w.handleStopTasks)
@@ -73,6 +74,19 @@ func (w *WorktrackerServer) setAllTasksInactive() {
 	tasks := w.store.GetAllTasks()
 	for _, task := range tasks {
 		w.setTaskInactive(task)
+	}
+}
+
+func cors(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "*")
+	c.Header("Access-Control-Allow-Headers", "*")
+	c.Header("Content-Type", "application/json")
+
+	if c.Request.Method != "OPTIONS" {
+		c.Next()
+	} else {
+		c.AbortWithStatus(http.StatusOK)
 	}
 }
 
