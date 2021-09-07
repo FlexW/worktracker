@@ -91,14 +91,22 @@ func cors(c *gin.Context) {
 }
 
 func (w *WorktrackerServer) handleNewTask(c *gin.Context) {
-	var newTask Task
+	var newTask NewTask
 
 	if err:= c.BindJSON(&newTask); err != nil {
 		return
 	}
 	w.setAllTasksInactive()
-	newTask.Id = w.store.InsertTask(&newTask)
-	c.IndentedJSON(http.StatusCreated, newTask)
+
+	timeInterval := TimeInterval{StartTime: newTask.StartTime, EndTime: newTask.EndTime}
+	task := Task{
+		Title: newTask.Title,
+		Description: newTask.Description,
+		TimeIntervals: []TimeInterval{timeInterval},
+	}
+
+	task.Id = w.store.InsertTask(&task)
+	c.IndentedJSON(http.StatusCreated, task)
 }
 
 func (w *WorktrackerServer) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
