@@ -29,6 +29,35 @@ func (w *WorktrackerServer) handleTasks(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, tasks)
 }
 
+func (w *WorktrackerServer) calculateTaskDuration(task *Task) time.Duration {
+	timeIntervals := w.store.GetTimeIntervalsByTaskId(task.Id)
+	var entireDuration time.Duration
+	for _, timeInterval := range timeIntervals {
+		if timeInterval.EndTime != nil {
+			entireDuration += timeInterval.EndTime.Sub(timeInterval.StartTime)
+		} else {
+			entireDuration += time.Now().Sub(timeInterval.StartTime)
+		}
+	}
+	return entireDuration
+}
+
+// func calculateTasksWithDurations(tasks []*Task) []*Task {
+// 	var durations []*TaskWithDuration
+// 	for _, task := range tasks {
+// 		durations = append(durations, &TaskWithDuration{
+// 			Id: task.Id,
+// 			Duration: calculateTaskDuration(task),
+// 		})
+// 	}
+// 	return durations
+// }
+
+// func (w *WorktrackerServer) handleTasksDurations(c *gin.Context) {
+// 	tasks := w.store.GetAllTasks()
+// 	c.IndentedJSON(http.StatusOK, calculateTasksWithDurations(tasks))
+// }
+
 func (w *WorktrackerServer) handleTaskById(c *gin.Context) {
 	taskId := c.GetInt("id")
 	task := w.store.GetTaskById(taskId)
@@ -36,13 +65,7 @@ func (w *WorktrackerServer) handleTaskById(c *gin.Context) {
 }
 
 func (w *WorktrackerServer) setTaskInactive(task *Task) {
-	for i := range task.TimeIntervals {
-		if task.TimeIntervals[i].EndTime == nil {
-			timeNow := time.Now()
-			task.TimeIntervals[i].EndTime = &timeNow
-			// TODO: Make sure task gets saved to disk. Capture this with e2e test
-		}
-	}
+	w.store.SetTaskInactive(task.Id)
 }
 
 type startTask struct {
@@ -60,10 +83,10 @@ func (w *WorktrackerServer) handleStartTask(c *gin.Context) {
 		c.Err()
 	}
 	w.setAllTasksInactive()
-	task := w.store.GetTaskById(taskId)
-	task.TimeIntervals = append(task.TimeIntervals, TimeInterval{StartTime: startTime, EndTime: nil})
-	w.store.UpdateTask(task)
-	c.IndentedJSON(http.StatusOK, task)
+	timeInterval := TimeInterval{StartTime: startTime, EndTime: nil}
+	w.store.SetTaskActive(taskId)
+	w.store.AddTimeIntervalToTask(taskId, &timeInterval)
+	c.IndentedJSON(http.StatusOK, timeInterval)
 }
 
 func (w *WorktrackerServer) handleStopTasks(c *gin.Context) {
@@ -102,10 +125,10 @@ func (w *WorktrackerServer) handleNewTask(c *gin.Context) {
 	task := Task{
 		Title: newTask.Title,
 		Description: newTask.Description,
-		TimeIntervals: []TimeInterval{timeInterval},
+		Active: timeInterval.EndTime == nil,
 	}
-
 	task.Id = w.store.InsertTask(&task)
+	w.store.AddTimeIntervalToTask(task.Id, &timeInterval)
 	c.IndentedJSON(http.StatusCreated, task)
 }
 

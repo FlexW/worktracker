@@ -9,48 +9,63 @@ import (
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/stretchr/testify/assert"
 )
 
-type TaskWithoutId struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	TimeIntervals []TimeInterval `json:"time_intervals"`
+// type TaskWithoutId struct {
+// 	Title       string        `json:"title"`
+// 	Description string        `json:"description"`
+// 	Duration    time.Duration `json:"duration"`
+// 	Active      bool          `json:"active"`
+// }
+
+type NewTaskWithoutId struct {
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	StartTime   time.Time  `json:"start_time"`
+	EndTime     *time.Time `json:"end_time"`
 }
 
-func taskWithoutIdToTask(taskWithoutId *TaskWithoutId, id int) *Task {
+func newTaskWithoutIdToTask(newTaskWithoutId *NewTaskWithoutId, id int) *Task {
+	var duration time.Duration
+	duration = 0
+	active := true
+	if newTaskWithoutId.EndTime != nil {
+		duration = newTaskWithoutId.EndTime.Sub(*newTaskWithoutId.EndTime)
+		active = false
+	}
 	return &Task{
-		Id: id,
-		Title: taskWithoutId.Title,
-		Description: taskWithoutId.Description,
-		TimeIntervals: taskWithoutId.TimeIntervals,
+		Id:          id,
+		Title:       newTaskWithoutId.Title,
+		Description: newTaskWithoutId.Description,
+		Duration:    duration,
+		Active:      active,
 	}
 }
 
 func createTasks() []*Task {
-	endTime := time.Now().Add(time.Hour)
-
 	return []*Task{
 		{
-			Id: 0,
-			Title: "Task One",
+			Id:          0,
+			Title:       "Task One",
 			Description: "Important task",
-			TimeIntervals: []TimeInterval{{time.Now(), &endTime}},
+			Duration:    1994,
+			Active:      false,
 		},
 		{
-			Id: 1,
-			Title: "Task Two",
+			Id:          1,
+			Title:       "Task Two",
 			Description: "Another important task",
-			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+			Duration:    207,
+			Active:      false,
 		},
 	}
 }
 
 func assertTasksInactive(t *testing.T, tasks []*Task) {
 	for _, task := range tasks {
-		for _, timeInterval := range task.TimeIntervals {
-			assert.NotNil(t, timeInterval.EndTime)
-		}
+		assert.False(t, task.Active)
 	}
 }
 
@@ -75,19 +90,28 @@ func assertTaskEqual(t *testing.T, expectedTask *Task, actualTask *Task) {
 	assert.Equal(t, expectedTask.Id, actualTask.Id)
 	assert.Equal(t, expectedTask.Title, actualTask.Title)
 	assert.Equal(t, expectedTask.Description, actualTask.Description)
+	assert.Equal(t, expectedTask.Active, actualTask.Active)
+	assert.Equal(t, expectedTask.Duration, actualTask.Duration)
 }
 
 func assertTasksEqual(t *testing.T, expectedTasks []*Task, actualTasks []*Task) {
 	assert.Equal(t, len(expectedTasks), len(actualTasks))
 	for i := range expectedTasks {
-		assertTaskEqual(t, expectedTasks[i], actualTasks[i])
+		found := false
+		for j := range actualTasks {
+			if expectedTasks[i].Id == actualTasks[j].Id {
+				assertTaskEqual(t, expectedTasks[i], actualTasks[j])
+				found = true
+			}
+		}
+		assert.True(t, found)
 	}
 }
 
 func TestTasks(t *testing.T) {
 	t.Run("get all tasks", func(t *testing.T) {
 		expectedTasks := createTasks()
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(expectedTasks))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(expectedTasks))
 		request, _ := http.NewRequest(http.MethodGet, "/tasks/", nil)
 		response := httptest.NewRecorder()
 
@@ -101,7 +125,7 @@ func TestTasks(t *testing.T) {
 	t.Run("get task by id", func(t *testing.T) {
 		expectedTasks := createTasks()
 		expectedTask := expectedTasks[0]
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(expectedTasks))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(expectedTasks))
 		request, _ := http.NewRequest(http.MethodGet, "/tasks/0", nil)
 		response := httptest.NewRecorder()
 
@@ -112,13 +136,14 @@ func TestTasks(t *testing.T) {
 		assertTaskEqual(t, expectedTask, &actualTask)
 	})
 
-	t.Run("create new task", func(t *testing.T) {
-		newTask := TaskWithoutId{
-			Title: "Some Task",
+	t.Run("create new active task", func(t *testing.T) {
+		newTask := NewTaskWithoutId{
+			Title:       "Some Task",
 			Description: "Description",
-			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+			StartTime:   time.Now(),
+			EndTime:     nil,
 		}
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(make([]*Task,0)))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(make([]*Task, 0)))
 		newTaskJson, _ := json.Marshal(&newTask)
 		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
 		response := httptest.NewRecorder()
@@ -126,17 +151,38 @@ func TestTasks(t *testing.T) {
 		worktrackerServer.ServeHTTP(response, request)
 
 		taskInStore := worktrackerServer.store.GetAllTasks()[0]
-		assertTaskEqual(t, taskWithoutIdToTask(&newTask, taskInStore.Id), taskInStore)
+		assertTaskEqual(t, newTaskWithoutIdToTask(&newTask, taskInStore.Id), taskInStore)
 	})
 
-	t.Run("create new task without end time then finish current active task", func(t *testing.T) {
-		newTask := Task{
-			Id: 2,
-			Title: "Task One",
-			Description: "Important task",
-			TimeIntervals: []TimeInterval{{time.Now(), nil}},
+	t.Run("create new inactive task", func(t *testing.T) {
+		startTime := time.Now()
+		endTime := startTime.Add(time.Hour)
+		newTask := NewTaskWithoutId{
+			Title:       "Some Task",
+			Description: "Description",
+			StartTime:   startTime,
+			EndTime:     &endTime,
 		}
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(make([]*Task, 0)))
+		newTaskJson, _ := json.Marshal(&newTask)
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		taskInStore := worktrackerServer.store.GetAllTasks()[0]
+		assertTaskEqual(t, newTaskWithoutIdToTask(&newTask, taskInStore.Id), taskInStore)
+	})
+
+	t.Run("create new active task then finish current active task", func(t *testing.T) {
+		newTask := Task{
+			Id:          2,
+			Title:       "Task One",
+			Description: "Important task",
+			Duration:    2008,
+			Active:      true,
+		}
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(createTasks()))
 		newTaskJson, _ := json.Marshal(&newTask)
 		request, _ := http.NewRequest(http.MethodPost, "/tasks/", bytes.NewBuffer(newTaskJson))
 		response := httptest.NewRecorder()
@@ -146,17 +192,15 @@ func TestTasks(t *testing.T) {
 		tasksInStore := worktrackerServer.store.GetAllTasks()
 		for _, taskInStore := range tasksInStore {
 			if taskInStore.Id != newTask.Id {
-				for _, timestamps := range taskInStore.TimeIntervals {
-					assert.NotNil(t, timestamps.EndTime)
-				}
+				assert.False(t, taskInStore.Active)
 			} else {
-				assert.Nil(t, taskInStore.TimeIntervals[0].EndTime)
+				assert.True(t, taskInStore.Active)
 			}
 		}
 	})
 
 	t.Run("stop current task", func(t *testing.T) {
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(createTasks()))
 		request, _ := http.NewRequest(http.MethodPost, "/tasks/stop", nil)
 		response := httptest.NewRecorder()
 
@@ -167,18 +211,73 @@ func TestTasks(t *testing.T) {
 	})
 
 	t.Run("start stopped task again", func(t *testing.T) {
-		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(createTasks()))
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStoreWithoutTimeIntervals(createTasks()))
 		timeNow := time.Now()
 		requestData := []byte(fmt.Sprintf(`{
-            "start_time": "%v"
-        }`, timeNow.Format(time.RFC3339)))
+	        "start_time": "%v"
+	    }`, timeNow.Format(time.RFC3339)))
 		request, _ := http.NewRequest(http.MethodPost, "/tasks/0", bytes.NewBuffer(requestData))
 		response := httptest.NewRecorder()
 
 		worktrackerServer.ServeHTTP(response, request)
 
-		taskInStore := worktrackerServer.store.GetTaskById(0)
-		assert.NotNil(t, taskInStore.TimeIntervals[0].EndTime)
-		assert.Equal(t, timeNow.Truncate(time.Second), taskInStore.TimeIntervals[1].StartTime)
+		for _, task := range worktrackerServer.store.GetAllTasks() {
+			if task.Id == 0 {
+				assert.True(t, task.Active)
+			} else {
+				assert.False(t, task.Active)
+			}
+		}
+	})
+
+	t.Run("task has correct duration after stop", func(t *testing.T) {
+		timeIntervalStart := time.Now()
+		timeInterval := &TimeInterval{StartTime: timeIntervalStart, EndTime: nil}
+		task := &Task{Id: 0, Title: "Some task", Description: "Some desc", Active: true, Duration: 0}
+		tasks := make([]*Task, 0)
+		tasks = append(tasks, task)
+		timeIntervals := make(map[int][]*TimeInterval)
+		timeIntervals[task.Id] = []*TimeInterval{timeInterval}
+
+		timeIntervalEnd := timeIntervalStart.Add(time.Hour)
+		patch := monkey.Patch(time.Now, func() time.Time { return timeIntervalEnd })
+		defer patch.Unpatch()
+
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(tasks, timeIntervals))
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/stop", nil)
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		taskFromStore := worktrackerServer.store.GetTaskById(task.Id)
+		duration := timeIntervalEnd.Sub(timeIntervalStart)
+		assert.Equal(t, duration, taskFromStore.Duration)
+	})
+
+	t.Run("task has correct duration after multiple stops", func(t *testing.T) {
+		timeStartInterval1 := time.Now()
+		timeEndInterval1 := timeStartInterval1.Add(time.Minute * 5)
+		timeStartInterval2 := timeEndInterval1.Add(time.Minute * 10)
+		timeInterval1 := &TimeInterval{StartTime: timeStartInterval1, EndTime: &timeEndInterval1}
+		timeInterval2 := &TimeInterval{StartTime: timeStartInterval2, EndTime: nil}
+		task := &Task{Id: 0, Title: "Some task", Description: "Some desc", Active: true, Duration: 0}
+		tasks := make([]*Task, 0)
+		tasks = append(tasks, task)
+		timeIntervals := make(map[int][]*TimeInterval)
+		timeIntervals[task.Id] = []*TimeInterval{timeInterval1, timeInterval2}
+
+		timeEndInterval2 := timeStartInterval2.Add(time.Hour)
+		timeNowPatch := monkey.Patch(time.Now, func() time.Time { return timeEndInterval2 })
+		defer timeNowPatch.Unpatch()
+
+		worktrackerServer := NewWorktrackerServer(NewInMemoryWorktrackerStore(tasks, timeIntervals))
+		request, _ := http.NewRequest(http.MethodPost, "/tasks/stop", nil)
+		response := httptest.NewRecorder()
+
+		worktrackerServer.ServeHTTP(response, request)
+
+		taskFromStore := worktrackerServer.store.GetTaskById(task.Id)
+		duration := timeEndInterval2.Sub(timeStartInterval2) + timeEndInterval1.Sub(timeStartInterval1)
+		assert.Equal(t, duration, taskFromStore.Duration)
 	})
 }
