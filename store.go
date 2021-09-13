@@ -6,6 +6,7 @@ import (
 
 type WorktrackerStore interface {
 	GetAllTasks() []*Task
+	GetAllTasksSince(since time.Time) []*Task
 	GetTaskById(taskId int) *Task
 	InsertTask(task *Task) int
 	UpdateTask(task *Task)
@@ -30,6 +31,22 @@ func NewInMemoryWorktrackerStoreWithoutTimeIntervals(tasks []*Task) *InMemoryWor
 
 func (s *InMemoryWorktrackerStore) GetAllTasks() []*Task {
 	return getTasksList(s.tasks)
+}
+
+func (s *InMemoryWorktrackerStore) GetAllTasksSince(since time.Time) []*Task {
+	tasks := make([]*Task, 0)
+
+	for _, task := range s.tasks {
+		timeIntervals := s.GetTimeIntervalsByTaskId(task.Id)
+		for _, timeInterval := range timeIntervals {
+			if timeInterval.StartTime.After(since) {
+				tasks = append(tasks, task)
+				break
+			}
+		}
+	}
+
+	return tasks
 }
 
 func (s *InMemoryWorktrackerStore) GetTaskById(taskId int) *Task {

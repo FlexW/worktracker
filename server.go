@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -21,12 +22,11 @@ func NewWorktrackerServer(store WorktrackerStore) *WorktrackerServer {
 	w.router.POST("/tasks/stop", w.handleStopTasks)
 	w.router.GET("/tasks/:id", w.handleTaskById)
 	w.router.POST("/tasks/:id", w.handleStartTask)
+	w.router.GET("/report/", w.handleReport)
 	return w
 }
 
-func (w *WorktrackerServer) handleTasks(c *gin.Context) {
-	tasks := w.store.GetAllTasks()
-
+func (w *WorktrackerServer) updateDurations(tasks []*Task) []*Task {
 	for _, task := range tasks {
 		if task.Active {
 			duration := calculateDuration(w.store.GetTimeIntervalsByTaskId(task.Id))
@@ -34,7 +34,33 @@ func (w *WorktrackerServer) handleTasks(c *gin.Context) {
 			w.store.UpdateTask(task)
 		}
 	}
+	return tasks
+}
 
+func generateReport(tasks []*Task) string {
+	report := "# Tasks\n\n"
+
+	for _, task := range tasks {
+		report += fmt.Sprintf("* %s\n  %s\n\n", task.Title, task.Description)
+	}
+
+	return report
+}
+
+type report struct {
+	Report string `json:"report"`
+}
+
+func (w *WorktrackerServer) handleReport(c *gin.Context) {
+	now := time.Now().UTC()
+	startOfWeek := now.AddDate(0, 0, int(now.Weekday()-7))
+	tasks := w.updateDurations(w.store.GetAllTasksSince(startOfWeek))
+	reportStr := generateReport(tasks)
+	c.IndentedJSON(http.StatusOK, report{Report: reportStr})
+}
+
+func (w *WorktrackerServer) handleTasks(c *gin.Context) {
+	tasks := w.updateDurations(w.store.GetAllTasks())
 	c.IndentedJSON(http.StatusOK, tasks)
 }
 
