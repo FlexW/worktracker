@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
-
 type WorktrackerServer struct {
-	store WorktrackerStore
+	store  WorktrackerStore
 	router *gin.Engine
 }
 
@@ -21,11 +21,20 @@ func NewWorktrackerServer(store WorktrackerStore) *WorktrackerServer {
 	w.router.POST("/tasks/stop", w.handleStopTasks)
 	w.router.GET("/tasks/:id", w.handleTaskById)
 	w.router.POST("/tasks/:id", w.handleStartTask)
-	return w;
+	return w
 }
 
 func (w *WorktrackerServer) handleTasks(c *gin.Context) {
 	tasks := w.store.GetAllTasks()
+
+	for _, task := range tasks {
+		if task.Active {
+			duration := calculateDuration(w.store.GetTimeIntervalsByTaskId(task.Id))
+			task.Duration = duration
+			w.store.UpdateTask(task)
+		}
+	}
+
 	c.IndentedJSON(http.StatusOK, tasks)
 }
 
@@ -42,34 +51,14 @@ func (w *WorktrackerServer) calculateTaskDuration(task *Task) time.Duration {
 	return entireDuration
 }
 
-// func calculateTasksWithDurations(tasks []*Task) []*Task {
-// 	var durations []*TaskWithDuration
-// 	for _, task := range tasks {
-// 		durations = append(durations, &TaskWithDuration{
-// 			Id: task.Id,
-// 			Duration: calculateTaskDuration(task),
-// 		})
-// 	}
-// 	return durations
-// }
-
-// func (w *WorktrackerServer) handleTasksDurations(c *gin.Context) {
-// 	tasks := w.store.GetAllTasks()
-// 	c.IndentedJSON(http.StatusOK, calculateTasksWithDurations(tasks))
-// }
-
 func (w *WorktrackerServer) handleTaskById(c *gin.Context) {
 	taskId := c.GetInt("id")
 	task := w.store.GetTaskById(taskId)
 	c.IndentedJSON(http.StatusOK, task)
 }
 
-func (w *WorktrackerServer) setTaskInactive(task *Task) {
-	w.store.SetTaskInactive(task.Id)
-}
-
 type startTask struct {
-	StartTime string `json:"start_time"`
+	StartTime string `json:"startTime"`
 }
 
 func (w *WorktrackerServer) handleStartTask(c *gin.Context) {
@@ -96,7 +85,7 @@ func (w *WorktrackerServer) handleStopTasks(c *gin.Context) {
 func (w *WorktrackerServer) setAllTasksInactive() {
 	tasks := w.store.GetAllTasks()
 	for _, task := range tasks {
-		w.setTaskInactive(task)
+		w.store.SetTaskInactive(task.Id)
 	}
 }
 
@@ -116,16 +105,17 @@ func cors(c *gin.Context) {
 func (w *WorktrackerServer) handleNewTask(c *gin.Context) {
 	var newTask NewTask
 
-	if err:= c.BindJSON(&newTask); err != nil {
+	if err := c.BindJSON(&newTask); err != nil {
+		log.Warn().Err(err).Msg("Could not parse json for creating new task")
 		return
 	}
 	w.setAllTasksInactive()
 
 	timeInterval := TimeInterval{StartTime: newTask.StartTime, EndTime: newTask.EndTime}
 	task := Task{
-		Title: newTask.Title,
+		Title:       newTask.Title,
 		Description: newTask.Description,
-		Active: timeInterval.EndTime == nil,
+		Active:      timeInterval.EndTime == nil,
 	}
 	task.Id = w.store.InsertTask(&task)
 	w.store.AddTimeIntervalToTask(task.Id, &timeInterval)

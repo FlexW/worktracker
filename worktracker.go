@@ -1,11 +1,19 @@
 package main
 
 import (
-	"log"
 	"net/http"
+	"os"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	server := NewWorktrackerServer(NewInMemoryWorktrackerStore(make([]*Task, 0), map[int][]*TimeInterval{}))
-	log.Fatal(http.ListenAndServe(":12345", server))
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+
+	server := NewWorktrackerServer(
+		NewInMemoryWorktrackerStore(make([]*Task, 0), map[int][]*TimeInterval{}))
+
+	log.Err(http.ListenAndServe(":12345", server))
 }

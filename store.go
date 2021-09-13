@@ -1,6 +1,8 @@
 package main
 
-import "time"
+import (
+	"time"
+)
 
 type WorktrackerStore interface {
 	GetAllTasks() []*Task
@@ -46,11 +48,12 @@ func (s *InMemoryWorktrackerStore) UpdateTask(task *Task) {
 
 func calculateDuration(timeIntervals []*TimeInterval) time.Duration {
 	var entireDuration time.Duration
+
 	for _, timeInterval := range timeIntervals {
 		if timeInterval.EndTime != nil {
 			entireDuration += timeInterval.EndTime.Sub(timeInterval.StartTime)
 		} else {
-			entireDuration += time.Now().Sub(timeInterval.StartTime)
+			entireDuration += time.Now().UTC().Sub(timeInterval.StartTime)
 		}
 	}
 	return entireDuration
@@ -66,6 +69,7 @@ func (s *InMemoryWorktrackerStore) updateTaskDuration(taskId int) {
 func (s *InMemoryWorktrackerStore) AddTimeIntervalToTask(taskId int, timeInterval *TimeInterval) {
 	timeIntervals := s.timeIntervals[taskId]
 	timeIntervals = append(timeIntervals, timeInterval)
+	s.timeIntervals[taskId] = timeIntervals
 	s.updateTaskDuration(taskId)
 }
 
@@ -79,7 +83,7 @@ func (s *InMemoryWorktrackerStore) SetTaskInactive(taskId int) {
 	timeIntervals := s.timeIntervals[taskId]
 	for i := range timeIntervals {
 		if timeIntervals[i].EndTime == nil {
-			timeNow := time.Now()
+			timeNow := time.Now().UTC()
 			timeIntervals[i].EndTime = &timeNow
 		}
 	}

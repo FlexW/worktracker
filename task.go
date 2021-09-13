@@ -13,11 +13,11 @@ type Task struct {
 type NewTask struct {
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
-	StartTime   time.Time  `json:"start_time"`
-	EndTime     *time.Time `json:"end_time"`
+	StartTime   time.Time  `json:"startTime"`
+	EndTime     *time.Time `json:"endTime"`
 }
 
 type TimeInterval struct {
-	StartTime time.Time  `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
+	StartTime time.Time  `json:"startTime"`
+	EndTime   *time.Time `json:"endTime"`
 }
